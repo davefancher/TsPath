@@ -82,6 +82,80 @@
         return LineToCommand;
     })();
 
+    var CubicBezierCurveCommand = (function () {
+        function CubicBezierCurveCommand(cp1, cp2, ep) {
+            this._controlPoint1 = cp1;
+            this._controlPoint2 = cp2;
+            this._endPoint = ep;
+        }
+        Object.defineProperty(CubicBezierCurveCommand.prototype, "ControlPoint1", {
+            get: function () {
+                return this._controlPoint1;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(CubicBezierCurveCommand.prototype, "ControlPoint2", {
+            get: function () {
+                return this._controlPoint2;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(CubicBezierCurveCommand.prototype, "EndPoint", {
+            get: function () {
+                return this._endPoint;
+            },
+            enumerable: true,
+            configurable: true
+        });
+
+        CubicBezierCurveCommand.prototype.Invoke = function (context) {
+            context.bezierCurveTo(this._controlPoint1.X, this._controlPoint1.Y, this._controlPoint2.X, this._controlPoint2.Y, this._endPoint.X, this._endPoint.Y);
+        };
+        return CubicBezierCurveCommand;
+    })();
+
+    var QuadraticBezierCurveCommand = (function () {
+        function QuadraticBezierCurveCommand(cp, ep) {
+            this._controlPoint = cp;
+            this._endPoint = ep;
+        }
+        Object.defineProperty(QuadraticBezierCurveCommand.prototype, "ControlPoint", {
+            get: function () {
+                return this._controlPoint;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        Object.defineProperty(QuadraticBezierCurveCommand.prototype, "EndPoint", {
+            get: function () {
+                return this._endPoint;
+            },
+            enumerable: true,
+            configurable: true
+        });
+
+        QuadraticBezierCurveCommand.prototype.Invoke = function (context) {
+            context.quadraticCurveTo(this._controlPoint.X, this._controlPoint.Y, this._endPoint.X, this._endPoint.Y);
+        };
+        return QuadraticBezierCurveCommand;
+    })();
+
+    var EllipticalArcCommand = (function () {
+        function EllipticalArcCommand(centerPoint, radius, startAngle, endAngle, counterClockwise) {
+            this._centerPoint = centerPoint;
+            this._radius = radius;
+            this._startAngle = startAngle;
+            this._endAngle = endAngle;
+            this._counterClockwise = counterClockwise;
+        }
+        EllipticalArcCommand.prototype.Invoke = function (context) {
+            context.arc(this._centerPoint.X, this._centerPoint.Y, this._radius, this._startAngle, this._endAngle, this._counterClockwise);
+        };
+        return EllipticalArcCommand;
+    })();
+
     var ClosePathCommand = (function () {
         function ClosePathCommand() {
         }
@@ -126,12 +200,20 @@
             return this._wsChars.indexOf(current) !== -1;
         };
 
+        PathParser.prototype.IsNegativeSign = function (current) {
+            return current === "-";
+        };
+
         PathParser.prototype.IsComma = function (current) {
             return current === ",";
         };
 
-        PathParser.prototype.IsNumberOrDecimal = function (current) {
-            return !isNaN(parseInt(current, 10)) || current === ".";
+        PathParser.prototype.IsDecimal = function (current) {
+            return current === ".";
+        };
+
+        PathParser.prototype.IsNumber = function (current) {
+            return !isNaN(parseInt(current, 10));
         };
 
         PathParser.prototype.SkipWhitespace = function (stream) {
@@ -147,10 +229,44 @@
         PathParser.prototype.ReadNumber = function (stream) {
             var numStr = "";
 
-            while (this.IsNumberOrDecimal(stream.Current)) {
+            if (this.IsNegativeSign(stream.Current)) {
                 numStr += stream.Current;
-                if (!stream.MoveNext())
-                    break;
+                stream.MoveNext();
+            }
+
+            if (this.IsNumber(stream.Current)) {
+                while (this.IsNumber(stream.Current)) {
+                    numStr += stream.Current;
+                    stream.MoveNext();
+                }
+            }
+
+            if (this.IsDecimal(stream.Current)) {
+                numStr += stream.Current;
+                stream.MoveNext();
+
+                if (this.IsNumber(stream.Current)) {
+                    while (this.IsNumber(stream.Current)) {
+                        numStr += stream.Current;
+                        stream.MoveNext();
+                    }
+
+                    if (stream.Current === "E") {
+                        numStr += stream.Current;
+                        stream.MoveNext();
+                        if (this.IsNegativeSign(stream.Current)) {
+                            numStr += stream.Current;
+                            stream.MoveNext();
+                        }
+
+                        if (!this.IsNumber(stream.Current))
+                            throw "Invalid number";
+                        while (this.IsNumber(stream.Current)) {
+                            numStr += stream.Current;
+                            stream.MoveNext();
+                        }
+                    }
+                }
             }
 
             return Number(numStr);
@@ -216,6 +332,26 @@
             return commands;
         };
 
+        PathParser.prototype.ParseCubicBezierCurveCommand = function (stream) {
+            if (!stream.MoveNext())
+                throw "Unexpected end of stream while parsing line to command";
+            this.SkipWhitespace(stream);
+
+            var commands = [];
+
+            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
+                var cp1 = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                var cp2 = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                var ep = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                commands.push(new CubicBezierCurveCommand(cp1, cp2, ep));
+            }
+
+            return commands;
+        };
+
         PathParser.prototype.ParseClosePathCommand = function (stream) {
             stream.MoveNext();
             this.SkipWhitespace(stream);
@@ -243,7 +379,7 @@
                 case "L":
                     return this.ParseLineToCommand(stream);
                 case "C":
-                    return [];
+                    return this.ParseCubicBezierCurveCommand(stream);
                 case "Q":
                     return [];
                 case "A":
@@ -261,7 +397,7 @@
             if (path === "")
                 return [];
 
-            var stream = new TextStream(path);
+            var stream = new TextStream(path.toUpperCase());
 
             this.ResolveInitialCommand(stream).forEach(function (c) {
                 return c.Invoke(context);
@@ -279,7 +415,7 @@
             }
 
             context.stroke();
-            //context.fill();
+            context.fill();
         };
         return PathParser;
     })();

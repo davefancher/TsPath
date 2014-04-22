@@ -63,6 +63,79 @@
         }
     }
 
+    class CubicBezierCurveCommand implements IPathCommand {
+        private _controlPoint1: Point;
+        private _controlPoint2: Point;
+        private _endPoint: Point;
+
+        get ControlPoint1(): Point { return this._controlPoint1; }
+        get ControlPoint2(): Point { return this._controlPoint2; }
+        get EndPoint(): Point { return this._endPoint; }
+
+        constructor(cp1: Point, cp2: Point, ep: Point) {
+            this._controlPoint1 = cp1;
+            this._controlPoint2 = cp2;
+            this._endPoint = ep;
+        }
+
+        Invoke(context: CanvasRenderingContext2D) {
+            context.bezierCurveTo(
+                this._controlPoint1.X,
+                this._controlPoint1.Y,
+                this._controlPoint2.X,
+                this._controlPoint2.Y,
+                this._endPoint.X,
+                this._endPoint.Y);
+        }
+    }
+
+    class QuadraticBezierCurveCommand implements IPathCommand {
+        private _controlPoint: Point;
+        private _endPoint: Point;
+
+        get ControlPoint(): Point { return this._controlPoint; }
+        get EndPoint(): Point { return this._endPoint; }
+
+        constructor(cp: Point, ep: Point) {
+            this._controlPoint = cp;
+            this._endPoint = ep;
+        }
+
+        Invoke(context: CanvasRenderingContext2D) {
+            context.quadraticCurveTo(
+                this._controlPoint.X,
+                this._controlPoint.Y,
+                this._endPoint.X,
+                this._endPoint.Y);
+        }
+    }
+
+    class EllipticalArcCommand implements IPathCommand {
+        private _centerPoint: Point;
+        private _radius: number;
+        private _startAngle: number;
+        private _endAngle: number;
+        private _counterClockwise: boolean;
+
+        constructor(centerPoint: Point, radius: number, startAngle: number, endAngle: number, counterClockwise: boolean) {
+            this._centerPoint = centerPoint;
+            this._radius = radius;
+            this._startAngle = startAngle;
+            this._endAngle = endAngle;
+            this._counterClockwise = counterClockwise;
+        }
+
+        Invoke(context: CanvasRenderingContext2D) {
+            context.arc(
+                this._centerPoint.X,
+                this._centerPoint.Y,
+                this._radius,
+                this._startAngle,
+                this._endAngle,
+                this._counterClockwise);
+        }
+    }
+
     class ClosePathCommand implements IPathCommand {
         constructor() {
         }
@@ -101,12 +174,20 @@
             return this._wsChars.indexOf(current) !== -1;
         }
 
+        private IsNegativeSign(current: string): boolean {
+            return current === "-";
+        }
+
         private IsComma(current: string): boolean {
             return current === ",";
         }
 
-        private IsNumberOrDecimal(current: string) {
-            return !isNaN(parseInt(current, 10)) || current === ".";
+        private IsDecimal(current: string): boolean {
+            return current === ".";
+        }
+
+        private IsNumber(current: string) {
+            return !isNaN(parseInt(current, 10));
         }
 
         private SkipWhitespace(stream: TextStream) {
@@ -120,9 +201,43 @@
         private ReadNumber(stream: TextStream): number {
             var numStr = "";
 
-            while (this.IsNumberOrDecimal(stream.Current)) {
+            if (this.IsNegativeSign(stream.Current)) {
                 numStr += stream.Current;
-                if (!stream.MoveNext()) break;
+                stream.MoveNext();
+            }
+
+            if(this.IsNumber(stream.Current)) {
+                while (this.IsNumber(stream.Current)) {
+                    numStr += stream.Current;
+                    stream.MoveNext();
+                }
+            }
+
+            if (this.IsDecimal(stream.Current)) {
+                numStr += stream.Current;
+                stream.MoveNext();
+
+                if (this.IsNumber(stream.Current)) {
+                    while (this.IsNumber(stream.Current)) {
+                        numStr += stream.Current;
+                        stream.MoveNext();
+                    }
+
+                    if (stream.Current === "E") {
+                        numStr += stream.Current;
+                        stream.MoveNext();
+                        if (this.IsNegativeSign(stream.Current)) {
+                            numStr += stream.Current;
+                            stream.MoveNext();
+                        }
+
+                        if (!this.IsNumber(stream.Current)) throw "Invalid number"
+                        while (this.IsNumber(stream.Current)) {
+                            numStr += stream.Current;
+                            stream.MoveNext();
+                        }
+                    }
+                }
             }
 
             return Number(numStr);
@@ -185,6 +300,25 @@
             return commands;
         }
 
+        private ParseCubicBezierCurveCommand(stream: TextStream): IPathCommand[]{
+            if (!stream.MoveNext()) throw "Unexpected end of stream while parsing line to command";
+            this.SkipWhitespace(stream);
+
+            var commands: IPathCommand[] = [];
+
+            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
+                var cp1 = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                var cp2 = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                var ep = this.ReadPoint(stream);
+                this.SkipWhitespace(stream);
+                commands.push(new CubicBezierCurveCommand(cp1, cp2, ep));
+            }
+
+            return commands;
+        }
+
         private ParseClosePathCommand(stream: TextStream): IPathCommand[] {
             stream.MoveNext();
             this.SkipWhitespace(stream);
@@ -207,7 +341,7 @@
             switch (stream.Current) {
                 case "M": return this.ParseMoveToCommand(stream);
                 case "L": return this.ParseLineToCommand(stream);
-                case "C": return [];
+                case "C": return this.ParseCubicBezierCurveCommand(stream);
                 case "Q": return [];
                 case "A": return [];
                 case "Z": return this.ParseClosePathCommand(stream);
@@ -220,7 +354,7 @@
             if (context === null) throw "Missing drawing context";
             if (path === "") return [];
 
-            var stream = new TextStream(path);
+            var stream = new TextStream(path.toUpperCase());
 
             this.ResolveInitialCommand(stream).forEach(c => c.Invoke(context));
 
@@ -232,7 +366,7 @@
             }
 
             context.stroke();
-            //context.fill();
+            context.fill();
         }
     }
 }
