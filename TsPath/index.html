@@ -1,0 +1,25 @@
+﻿<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>TypeScript HTML App</title>
+    <link rel="stylesheet" href="app.css" type="text/css" />
+    <script src="TsPath.js"></script>
+</head>
+<body>
+    <h1>TypeScript HTML App</h1>
+
+    <canvas width="500" height="500" id="testCanvas" style="border: solid 1px black;" />
+    <script language="javascript">
+        window.onload = function () {
+            var canvas = document.getElementById("testCanvas");
+            var context = canvas.getContext("2d");
+            context.scale(2, 2);
+            context.translate(5, 5);
+            var parser = new TsPath.PathParser();
+            var commands = parser.Parse(context, "F0M25 30L25,40 60,40 60 30Z");
+        };
+    </script>
+</body>
+</html>
