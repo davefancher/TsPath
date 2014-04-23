@@ -417,10 +417,8 @@
 class CanvasExtensions {
     static clearCanvas (canvas : HTMLCanvasElement) {
         var context = canvas.getContext("2d");
-        context.save();
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
-        context.restore();
     }
 
     static drawPath (canvas: HTMLCanvasElement, pathText: string, options?: any) {
