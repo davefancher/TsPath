@@ -1,7 +1,59 @@
 ﻿body {
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Segoe UI Light', sans-serif;
 }
 
-span {
-    font-style: italic;
+span.label {
+    width: 125px;
+    display: inline-block;
+    text-align: right;
+}
+
+select.property {
+    width: 100px;
+}
+
+h1 {
+    color: steelblue;
+    border-bottom: solid 2px steelblue;
+}
+
+h2 {
+    text-transform: lowercase;
+    color: steelblue;
+}
+
+section {
+    float: left;
+    width: 40%;
+}
+
+#controlPanel {
+    width: 300px;
+    margin-right: 50px;
+}
+
+#pathList {
+    width: 225px;
+    border: solid 1px black;
+    font-size: 14pt;
+}
+
+#canvasContainer {
+}
+
+#testCanvas {
+    width: 500px;
+    height: 300px;
+    overflow: auto;
+    border: solid 1px black;
+}
+
+#pathData {
+    border: solid 1px black;
+    text-transform: uppercase;
+    font-family: 'Courier New';
+    display: block;
+    overflow:auto;
+    width: 500px;
+    height: 300px;
 }

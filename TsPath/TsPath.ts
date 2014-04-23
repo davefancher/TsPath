@@ -194,6 +194,12 @@
             while (this.IsWhitespaceCharacter(stream.Current) && stream.MoveNext()) { }
         }
 
+        private SkipArgumentSeparator(stream: TextStream) {
+            this.SkipWhitespace(stream);
+            this.SkipComma(stream);
+            this.SkipWhitespace(stream);
+        }
+
         private SkipComma(stream: TextStream) {
             if (this.IsComma(stream.Current)) stream.MoveNext();
         }
@@ -245,9 +251,7 @@
 
         private ReadPoint(stream: TextStream): Point {
             var x = this.ReadNumber(stream);
-            this.SkipWhitespace(stream);
-            this.SkipComma(stream);
-            this.SkipWhitespace(stream);
+            this.SkipArgumentSeparator(stream);
             var y = this.ReadNumber(stream);
 
             return new Point(x, y);
@@ -308,12 +312,53 @@
 
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
                 var cp1 = this.ReadPoint(stream);
-                this.SkipWhitespace(stream);
+                this.SkipArgumentSeparator(stream);
                 var cp2 = this.ReadPoint(stream);
-                this.SkipWhitespace(stream);
+                this.SkipArgumentSeparator(stream);
                 var ep = this.ReadPoint(stream);
-                this.SkipWhitespace(stream);
+                this.SkipArgumentSeparator(stream);
                 commands.push(new CubicBezierCurveCommand(cp1, cp2, ep));
+            }
+
+            return commands;
+        }
+
+        private ParseQuadraticBezierCurveInterpreter(stream: TextStream): IPathCommand[] {
+            if (!stream.MoveNext()) throw "Unexpected end of stream while parsing line to command";
+            this.SkipWhitespace(stream);
+
+            var commands: IPathCommand[] = [];
+
+            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
+                var cp = this.ReadPoint(stream);
+                this.SkipArgumentSeparator(stream);
+                var ep = this.ReadPoint(stream);
+                this.SkipArgumentSeparator(stream);
+
+                commands.push(new QuadraticBezierCurveCommand(cp, ep));
+            }
+
+            return commands;
+        }
+
+        private ParseEllipticalArcInterpreter(stream: TextStream): IPathCommand[]{
+            if (!stream.MoveNext()) throw "Unexpected end of stream while parsing line to command";
+            this.SkipWhitespace(stream);
+
+            var commands: IPathCommand[] = [];
+
+            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
+                var center = this.ReadPoint(stream);
+                this.SkipArgumentSeparator(stream);
+                var radius = this.ReadNumber(stream);
+                this.SkipArgumentSeparator(stream);
+                var startAngle = this.ReadNumber(stream);
+                this.SkipArgumentSeparator(stream);
+                var endAngle = this.ReadNumber(stream);
+                this.SkipArgumentSeparator(stream);
+                var ccw = this.ReadNumber(stream) === 1;
+                this.SkipArgumentSeparator(stream);
+                commands.push(new EllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
             }
 
             return commands;
@@ -342,31 +387,63 @@
                 case "M": return this.ParseMoveToCommand(stream);
                 case "L": return this.ParseLineToCommand(stream);
                 case "C": return this.ParseCubicBezierCurveCommand(stream);
-                case "Q": return [];
-                case "A": return [];
+                case "Q": return this.ParseQuadraticBezierCurveInterpreter(stream);
+                case "A": return this.ParseEllipticalArcInterpreter(stream);
                 case "Z": return this.ParseClosePathCommand(stream);
             }
 
             throw "Invalid command";
         }
 
-        Parse(context: CanvasRenderingContext2D, path: string): IPathCommand[]{
-            if (context === null) throw "Missing drawing context";
+        Parse(path: string): IPathCommand[]{
             if (path === "") return [];
 
             var stream = new TextStream(path.toUpperCase());
 
-            this.ResolveInitialCommand(stream).forEach(c => c.Invoke(context));
+            var commands: IPathCommand[] = this.ResolveInitialCommand(stream);
 
             while (true) {
-                this.ResolveDrawingCommands(stream).forEach(c => c.Invoke(context));
+                commands = commands.concat(this.ResolveDrawingCommands(stream));
 
                 if (stream.Current != null && this.IsCommandCharacter(stream.Current)) continue;
                 if (!stream.MoveNext()) break;
             }
 
-            context.stroke();
-            context.fill();
+            return commands;
         }
     }
 }
+
+class CanvasExtensions {
+    static clearCanvas (canvas : HTMLCanvasElement) {
+        var context = canvas.getContext("2d");
+        context.save();
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.restore();
+    }
+
+    static drawPath (canvas: HTMLCanvasElement, pathText: string, options?: any) {
+        var context = canvas.getContext("2d");
+
+        if (options) {
+            context.lineWidth = options.strokeThickness || 1
+            context.strokeStyle = options.strokeStyle || "black";
+            context.fillStyle = options.fillStyle || "black";
+            context.scale(options.scaleX || 1, options.scaleY || 1);
+            context.translate(options.translateX || 0, options.translateY || 0);
+        } else {
+            context.lineWidth = 1;
+            context.strokeStyle = "black";
+            context.fillStyle = "black";
+        }
+
+        context.beginPath();
+
+        (new TsPath.PathParser()).Parse(pathText).forEach(c => c.Invoke(context));
+
+        context.stroke();
+        context.fill(context.msFillRule || "evenodd");
+    }
+}
+
