@@ -266,7 +266,7 @@
             return commands;
         };
 
-        PathParser.prototype.ParseQuadraticBezierCurveInterpreter = function (stream) {
+        PathParser.prototype.ParseQuadraticBezierCurveCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             this.SkipWhitespace(stream);
@@ -285,7 +285,7 @@
             return commands;
         };
 
-        PathParser.prototype.ParseEllipticalArcInterpreter = function (stream) {
+        PathParser.prototype.ParseEllipticalArcCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             this.SkipWhitespace(stream);
@@ -338,9 +338,9 @@
                 case "C":
                     return this.ParseCubicBezierCurveCommand(stream);
                 case "Q":
-                    return this.ParseQuadraticBezierCurveInterpreter(stream);
+                    return this.ParseQuadraticBezierCurveCommand(stream);
                 case "A":
-                    return this.ParseEllipticalArcInterpreter(stream);
+                    return this.ParseEllipticalArcCommand(stream);
                 case "Z":
                     return this.ParseClosePathCommand(stream);
             }
