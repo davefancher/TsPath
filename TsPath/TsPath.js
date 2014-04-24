@@ -28,141 +28,51 @@
         FillRule[FillRule["NonZero"] = 1] = "NonZero";
     })(FillRule || (FillRule = {}));
 
-    var FillRuleCommand = (function () {
-        function FillRuleCommand(rule) {
-            this._fillRule = rule;
+    var PathCommandFactory = (function () {
+        function PathCommandFactory() {
         }
-        Object.defineProperty(FillRuleCommand.prototype, "FillRule", {
-            get: function () {
-                return this._fillRule;
-            },
-            enumerable: true,
-            configurable: true
-        });
-
-        FillRuleCommand.prototype.Invoke = function (context) {
-            context.msFillRule = this._fillRule === 0 /* EvenOdd */ ? "evenodd" : "nonzero";
+        PathCommandFactory.createFillRuleCommand = function (fillRule) {
+            return function (context) {
+                return context.msFillRule = fillRule === 0 /* EvenOdd */ ? "evenodd" : "nonzero";
+            };
         };
-        return FillRuleCommand;
-    })();
 
-    var MoveToCommand = (function () {
-        function MoveToCommand(p) {
-            this._point = p;
-        }
-        Object.defineProperty(MoveToCommand.prototype, "Point", {
-            get: function () {
-                return this._point;
-            },
-            enumerable: true,
-            configurable: true
-        });
-
-        MoveToCommand.prototype.Invoke = function (context) {
-            context.moveTo(this._point.X, this.Point.Y);
+        PathCommandFactory.createMoveToCommand = function (p) {
+            return function (c) {
+                return c.moveTo(p.X, p.Y);
+            };
         };
-        return MoveToCommand;
-    })();
 
-    var LineToCommand = (function () {
-        function LineToCommand(p) {
-            this._point = p;
-        }
-        Object.defineProperty(LineToCommand.prototype, "Point", {
-            get: function () {
-                return this._point;
-            },
-            enumerable: true,
-            configurable: true
-        });
-
-        LineToCommand.prototype.Invoke = function (context) {
-            context.lineTo(this._point.X, this.Point.Y);
+        PathCommandFactory.createLineToCommand = function (p) {
+            return function (c) {
+                return c.lineTo(p.X, p.Y);
+            };
         };
-        return LineToCommand;
-    })();
 
-    var CubicBezierCurveCommand = (function () {
-        function CubicBezierCurveCommand(cp1, cp2, ep) {
-            this._controlPoint1 = cp1;
-            this._controlPoint2 = cp2;
-            this._endPoint = ep;
-        }
-        Object.defineProperty(CubicBezierCurveCommand.prototype, "ControlPoint1", {
-            get: function () {
-                return this._controlPoint1;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(CubicBezierCurveCommand.prototype, "ControlPoint2", {
-            get: function () {
-                return this._controlPoint2;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(CubicBezierCurveCommand.prototype, "EndPoint", {
-            get: function () {
-                return this._endPoint;
-            },
-            enumerable: true,
-            configurable: true
-        });
-
-        CubicBezierCurveCommand.prototype.Invoke = function (context) {
-            context.bezierCurveTo(this._controlPoint1.X, this._controlPoint1.Y, this._controlPoint2.X, this._controlPoint2.Y, this._endPoint.X, this._endPoint.Y);
+        PathCommandFactory.createCubicBezierCurveCommand = function (cp1, cp2, ep) {
+            return function (c) {
+                return c.bezierCurveTo(cp1.X, cp1.Y, cp2.X, cp2.Y, ep.X, ep.Y);
+            };
         };
-        return CubicBezierCurveCommand;
-    })();
 
-    var QuadraticBezierCurveCommand = (function () {
-        function QuadraticBezierCurveCommand(cp, ep) {
-            this._controlPoint = cp;
-            this._endPoint = ep;
-        }
-        Object.defineProperty(QuadraticBezierCurveCommand.prototype, "ControlPoint", {
-            get: function () {
-                return this._controlPoint;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        Object.defineProperty(QuadraticBezierCurveCommand.prototype, "EndPoint", {
-            get: function () {
-                return this._endPoint;
-            },
-            enumerable: true,
-            configurable: true
-        });
-
-        QuadraticBezierCurveCommand.prototype.Invoke = function (context) {
-            context.quadraticCurveTo(this._controlPoint.X, this._controlPoint.Y, this._endPoint.X, this._endPoint.Y);
+        PathCommandFactory.createQuadraticBezierCurveCommand = function (cp, ep) {
+            return function (c) {
+                return c.quadraticCurveTo(cp.X, cp.Y, ep.X, ep.Y);
+            };
         };
-        return QuadraticBezierCurveCommand;
-    })();
 
-    var EllipticalArcCommand = (function () {
-        function EllipticalArcCommand(centerPoint, radius, startAngle, endAngle, counterClockwise) {
-            this._centerPoint = centerPoint;
-            this._radius = radius;
-            this._startAngle = startAngle;
-            this._endAngle = endAngle;
-            this._counterClockwise = counterClockwise;
-        }
-        EllipticalArcCommand.prototype.Invoke = function (context) {
-            context.arc(this._centerPoint.X, this._centerPoint.Y, this._radius, this._startAngle, this._endAngle, this._counterClockwise);
+        PathCommandFactory.createEllipticalArcCommand = function (center, radius, startAngle, endAngle, counterClockwise) {
+            return function (c) {
+                return c.arc(center.X, center.Y, radius, startAngle, endAngle, counterClockwise);
+            };
         };
-        return EllipticalArcCommand;
-    })();
 
-    var ClosePathCommand = (function () {
-        function ClosePathCommand() {
-        }
-        ClosePathCommand.prototype.Invoke = function (context) {
-            context.closePath();
+        PathCommandFactory.createClosePathCommand = function () {
+            return function (c) {
+                return c.closePath();
+            };
         };
-        return ClosePathCommand;
+        return PathCommandFactory;
     })();
 
     var TextStream = (function () {
@@ -305,7 +215,7 @@
 
             this.SkipWhitespace(stream);
 
-            return [new FillRuleCommand(fillRule)];
+            return [PathCommandFactory.createFillRuleCommand(fillRule)];
         };
 
         PathParser.prototype.ParseMoveToCommand = function (stream) {
@@ -317,7 +227,7 @@
 
             this.SkipWhitespace(stream);
 
-            return [new MoveToCommand(p)];
+            return [PathCommandFactory.createMoveToCommand(p)];
         };
 
         PathParser.prototype.ParseLineToCommand = function (stream) {
@@ -330,7 +240,7 @@
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
                 var p = this.ReadPoint(stream);
                 this.SkipWhitespace(stream);
-                commands.push(new LineToCommand(p));
+                commands.push(PathCommandFactory.createLineToCommand(p));
             }
 
             return commands;
@@ -350,7 +260,7 @@
                 this.SkipArgumentSeparator(stream);
                 var ep = this.ReadPoint(stream);
                 this.SkipArgumentSeparator(stream);
-                commands.push(new CubicBezierCurveCommand(cp1, cp2, ep));
+                commands.push(PathCommandFactory.createCubicBezierCurveCommand(cp1, cp2, ep));
             }
 
             return commands;
@@ -369,7 +279,7 @@
                 var ep = this.ReadPoint(stream);
                 this.SkipArgumentSeparator(stream);
 
-                commands.push(new QuadraticBezierCurveCommand(cp, ep));
+                commands.push(PathCommandFactory.createQuadraticBezierCurveCommand(cp, ep));
             }
 
             return commands;
@@ -393,7 +303,7 @@
                 this.SkipArgumentSeparator(stream);
                 var ccw = this.ReadNumber(stream) === 1;
                 this.SkipArgumentSeparator(stream);
-                commands.push(new EllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
+                commands.push(PathCommandFactory.createEllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
             }
 
             return commands;
@@ -403,7 +313,7 @@
             stream.MoveNext();
             this.SkipWhitespace(stream);
 
-            return [new ClosePathCommand()];
+            return [PathCommandFactory.createClosePathCommand()];
         };
 
         PathParser.prototype.ResolveInitialCommand = function (stream) {
@@ -489,7 +399,7 @@ var CanvasExtensions = (function () {
         context.beginPath();
 
         (new TsPath.PathParser()).Parse(pathText).forEach(function (c) {
-            return c.Invoke(context);
+            return c(context);
         });
 
         context.stroke();

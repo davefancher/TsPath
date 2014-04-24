@@ -1,6 +1,6 @@
 ﻿module TsPath {
     export interface IPathCommand {
-        Invoke(context: CanvasRenderingContext2D): void;
+        (context: CanvasRenderingContext2D): void;
     }
 
     class Point {
@@ -21,127 +21,33 @@
         NonZero = 1
     }
 
-    class FillRuleCommand implements IPathCommand {
-        private _fillRule: FillRule;
-
-        get FillRule(): FillRule { return this._fillRule; }
-
-        constructor(rule: FillRule) {
-            this._fillRule = rule;
+    class PathCommandFactory {
+        static createFillRuleCommand(fillRule: FillRule): IPathCommand {
+            return (context: CanvasRenderingContext2D) => context.msFillRule = fillRule === FillRule.EvenOdd ? "evenodd" : "nonzero";
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.msFillRule = this._fillRule === FillRule.EvenOdd ? "evenodd" : "nonzero";
-        }
-    }
-
-    class MoveToCommand implements IPathCommand {
-        private _point: Point;
-
-        get Point(): Point { return this._point; }
-
-        constructor(p: Point) {
-            this._point = p;
+        static createMoveToCommand(p: Point): IPathCommand {
+            return c => c.moveTo(p.X, p.Y);
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.moveTo(this._point.X, this.Point.Y);
-        }
-    }
-
-    class LineToCommand implements IPathCommand {
-        private _point: Point;
-
-        get Point(): Point { return this._point; }
-
-        constructor(p: Point) {
-            this._point = p;
+        static createLineToCommand(p: Point): IPathCommand {
+            return c => c.lineTo(p.X, p.Y);
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.lineTo(this._point.X, this.Point.Y);
-        }
-    }
-
-    class CubicBezierCurveCommand implements IPathCommand {
-        private _controlPoint1: Point;
-        private _controlPoint2: Point;
-        private _endPoint: Point;
-
-        get ControlPoint1(): Point { return this._controlPoint1; }
-        get ControlPoint2(): Point { return this._controlPoint2; }
-        get EndPoint(): Point { return this._endPoint; }
-
-        constructor(cp1: Point, cp2: Point, ep: Point) {
-            this._controlPoint1 = cp1;
-            this._controlPoint2 = cp2;
-            this._endPoint = ep;
+        static createCubicBezierCurveCommand(cp1: Point, cp2: Point, ep: Point): IPathCommand {
+            return c => c.bezierCurveTo(cp1.X, cp1.Y, cp2.X, cp2.Y, ep.X, ep.Y);
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.bezierCurveTo(
-                this._controlPoint1.X,
-                this._controlPoint1.Y,
-                this._controlPoint2.X,
-                this._controlPoint2.Y,
-                this._endPoint.X,
-                this._endPoint.Y);
-        }
-    }
-
-    class QuadraticBezierCurveCommand implements IPathCommand {
-        private _controlPoint: Point;
-        private _endPoint: Point;
-
-        get ControlPoint(): Point { return this._controlPoint; }
-        get EndPoint(): Point { return this._endPoint; }
-
-        constructor(cp: Point, ep: Point) {
-            this._controlPoint = cp;
-            this._endPoint = ep;
+        static createQuadraticBezierCurveCommand(cp: Point, ep: Point): IPathCommand {
+            return c => c.quadraticCurveTo(cp.X, cp.Y, ep.X, ep.Y);
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.quadraticCurveTo(
-                this._controlPoint.X,
-                this._controlPoint.Y,
-                this._endPoint.X,
-                this._endPoint.Y);
-        }
-    }
-
-    class EllipticalArcCommand implements IPathCommand {
-        private _centerPoint: Point;
-        private _radius: number;
-        private _startAngle: number;
-        private _endAngle: number;
-        private _counterClockwise: boolean;
-
-        constructor(centerPoint: Point, radius: number, startAngle: number, endAngle: number, counterClockwise: boolean) {
-            this._centerPoint = centerPoint;
-            this._radius = radius;
-            this._startAngle = startAngle;
-            this._endAngle = endAngle;
-            this._counterClockwise = counterClockwise;
+        static createEllipticalArcCommand(center: Point, radius: number, startAngle: number, endAngle: number, counterClockwise: boolean): IPathCommand {
+            return c => c.arc(center.X, center.Y, radius, startAngle, endAngle, counterClockwise);
         }
 
-        Invoke(context: CanvasRenderingContext2D) {
-            context.arc(
-                this._centerPoint.X,
-                this._centerPoint.Y,
-                this._radius,
-                this._startAngle,
-                this._endAngle,
-                this._counterClockwise);
-        }
-    }
-
-    class ClosePathCommand implements IPathCommand {
-        constructor() {
-        }
-
-        Invoke(context: CanvasRenderingContext2D) {
-            context.closePath();
+        static createClosePathCommand(): IPathCommand {
+            return c => c.closePath();
         }
     }
 
@@ -275,7 +181,7 @@
 
             this.SkipWhitespace(stream);
 
-            return [new FillRuleCommand(fillRule)];
+            return [ PathCommandFactory.createFillRuleCommand(fillRule) ];
         }
 
         private ParseMoveToCommand(stream: TextStream): IPathCommand[] {
@@ -286,7 +192,7 @@
 
             this.SkipWhitespace(stream);
 
-            return [new MoveToCommand(p)];
+            return [ PathCommandFactory.createMoveToCommand(p) ];
         }
 
         private ParseLineToCommand(stream: TextStream): IPathCommand[] {
@@ -298,7 +204,7 @@
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
                 var p = this.ReadPoint(stream);
                 this.SkipWhitespace(stream);
-                commands.push(new LineToCommand(p));
+                commands.push(PathCommandFactory.createLineToCommand(p));
             }
 
             return commands;
@@ -317,7 +223,7 @@
                 this.SkipArgumentSeparator(stream);
                 var ep = this.ReadPoint(stream);
                 this.SkipArgumentSeparator(stream);
-                commands.push(new CubicBezierCurveCommand(cp1, cp2, ep));
+                commands.push(PathCommandFactory.createCubicBezierCurveCommand(cp1, cp2, ep));
             }
 
             return commands;
@@ -335,7 +241,7 @@
                 var ep = this.ReadPoint(stream);
                 this.SkipArgumentSeparator(stream);
 
-                commands.push(new QuadraticBezierCurveCommand(cp, ep));
+                commands.push(PathCommandFactory.createQuadraticBezierCurveCommand(cp, ep));
             }
 
             return commands;
@@ -358,7 +264,7 @@
                 this.SkipArgumentSeparator(stream);
                 var ccw = this.ReadNumber(stream) === 1;
                 this.SkipArgumentSeparator(stream);
-                commands.push(new EllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
+                commands.push(PathCommandFactory.createEllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
             }
 
             return commands;
@@ -368,7 +274,7 @@
             stream.MoveNext();
             this.SkipWhitespace(stream);
 
-            return [new ClosePathCommand()];
+            return [PathCommandFactory.createClosePathCommand()];
         }
 
         private ResolveInitialCommand(stream: TextStream): IPathCommand[] {
@@ -395,7 +301,7 @@
             throw "Invalid command";
         }
 
-        Parse(path: string): IPathCommand[]{
+        Parse(path: string): IPathCommand[] {
             if (path === "") return [];
 
             var stream = new TextStream(path.toUpperCase());
@@ -438,7 +344,7 @@ class CanvasExtensions {
 
         context.beginPath();
 
-        (new TsPath.PathParser()).Parse(pathText).forEach(c => c.Invoke(context));
+        (new TsPath.PathParser()).Parse(pathText).forEach(c => c(context));
 
         context.stroke();
         context.fill(context.msFillRule || "evenodd");
