@@ -1,5 +1,11 @@
 ﻿var TsPath;
 (function (TsPath) {
+    var FillRule;
+    (function (FillRule) {
+        FillRule[FillRule["EvenOdd"] = 0] = "EvenOdd";
+        FillRule[FillRule["NonZero"] = 1] = "NonZero";
+    })(FillRule || (FillRule = {}));
+
     var Point = (function () {
         function Point(x, y) {
             this._xCoordinate = x;
@@ -20,59 +26,6 @@
             configurable: true
         });
         return Point;
-    })();
-
-    var FillRule;
-    (function (FillRule) {
-        FillRule[FillRule["EvenOdd"] = 0] = "EvenOdd";
-        FillRule[FillRule["NonZero"] = 1] = "NonZero";
-    })(FillRule || (FillRule = {}));
-
-    var PathCommandFactory = (function () {
-        function PathCommandFactory() {
-        }
-        PathCommandFactory.createFillRuleCommand = function (fillRule) {
-            return function (context) {
-                return context.msFillRule = fillRule === 0 /* EvenOdd */ ? "evenodd" : "nonzero";
-            };
-        };
-
-        PathCommandFactory.createMoveToCommand = function (p) {
-            return function (c) {
-                return c.moveTo(p.X, p.Y);
-            };
-        };
-
-        PathCommandFactory.createLineToCommand = function (p) {
-            return function (c) {
-                return c.lineTo(p.X, p.Y);
-            };
-        };
-
-        PathCommandFactory.createCubicBezierCurveCommand = function (cp1, cp2, ep) {
-            return function (c) {
-                return c.bezierCurveTo(cp1.X, cp1.Y, cp2.X, cp2.Y, ep.X, ep.Y);
-            };
-        };
-
-        PathCommandFactory.createQuadraticBezierCurveCommand = function (cp, ep) {
-            return function (c) {
-                return c.quadraticCurveTo(cp.X, cp.Y, ep.X, ep.Y);
-            };
-        };
-
-        PathCommandFactory.createEllipticalArcCommand = function (center, radius, startAngle, endAngle, counterClockwise) {
-            return function (c) {
-                return c.arc(center.X, center.Y, radius, startAngle, endAngle, counterClockwise);
-            };
-        };
-
-        PathCommandFactory.createClosePathCommand = function () {
-            return function (c) {
-                return c.closePath();
-            };
-        };
-        return PathCommandFactory;
     })();
 
     var TextStream = (function () {
@@ -97,288 +50,348 @@
         return TextStream;
     })();
 
-    var PathParser = (function () {
-        function PathParser() {
-            this._wsChars = [" ", "\t"];
-            this._commandChars = ["M", "L", "C", "Q", "A", "Z"];
+    var _wsChars = [" ", "\t"];
+    var _commandChars = ["M", "L", "C", "Q", "A", "Z"];
+
+    var CommandFactory;
+    (function (CommandFactory) {
+        CommandFactory.createFillRuleCommand = function (fillRule) {
+            return (function (c) {
+                return c.msFillRule = fillRule === 0 /* EvenOdd */ ? "evenodd" : "nonzero";
+            });
+        };
+
+        CommandFactory.createMoveToCommand = function (p) {
+            return (function (c) {
+                return c.moveTo(p.X, p.Y);
+            });
+        };
+
+        CommandFactory.createLineToCommand = function (p) {
+            return (function (c) {
+                return c.lineTo(p.X, p.Y);
+            });
+        };
+
+        CommandFactory.createCubicBezierCurveCommand = function (cp1, cp2, ep) {
+            return (function (c) {
+                return c.bezierCurveTo(cp1.X, cp1.Y, cp2.X, cp2.Y, ep.X, ep.Y);
+            });
+        };
+
+        CommandFactory.createQuadraticBezierCurveCommand = function (cp, ep) {
+            return (function (c) {
+                return c.quadraticCurveTo(cp.X, cp.Y, ep.X, ep.Y);
+            });
+        };
+
+        CommandFactory.createEllipticalArcCommand = function (center, radius, startAngle, endAngle, counterClockwise) {
+            return (function (c) {
+                return c.arc(center.X, center.Y, radius, startAngle, endAngle, counterClockwise);
+            });
+        };
+
+        CommandFactory.createClosePathCommand = function () {
+            return (function (c) {
+                return c.closePath();
+            });
+        };
+    })(CommandFactory || (CommandFactory = {}));
+
+    (function (PathParser) {
+        function isCommandCharacter(current) {
+            return _commandChars.indexOf(current) !== -1;
         }
-        PathParser.prototype.IsCommandCharacter = function (current) {
-            return this._commandChars.indexOf(current) !== -1;
-        };
 
-        PathParser.prototype.IsWhitespaceCharacter = function (current) {
-            return this._wsChars.indexOf(current) !== -1;
-        };
+        function isWhitespaceCharacter(current) {
+            return _wsChars.indexOf(current) !== -1;
+        }
 
-        PathParser.prototype.IsNegativeSign = function (current) {
+        function isNegativeSign(current) {
             return current === "-";
-        };
+        }
 
-        PathParser.prototype.IsComma = function (current) {
+        function isComma(current) {
             return current === ",";
-        };
+        }
 
-        PathParser.prototype.IsDecimal = function (current) {
+        function isDecimal(current) {
             return current === ".";
-        };
+        }
 
-        PathParser.prototype.IsNumber = function (current) {
+        function isDigit(current) {
             return !isNaN(parseInt(current, 10));
-        };
+        }
 
-        PathParser.prototype.SkipWhitespace = function (stream) {
-            while (this.IsWhitespaceCharacter(stream.Current) && stream.MoveNext()) {
+        function skipWhitespace(stream) {
+            while (isWhitespaceCharacter(stream.Current) && stream.MoveNext()) {
             }
-        };
+        }
+        ;
 
-        PathParser.prototype.SkipArgumentSeparator = function (stream) {
-            this.SkipWhitespace(stream);
-            this.SkipComma(stream);
-            this.SkipWhitespace(stream);
-        };
-
-        PathParser.prototype.SkipComma = function (stream) {
-            if (this.IsComma(stream.Current))
+        function skipComma(stream) {
+            if (isComma(stream.Current))
                 stream.MoveNext();
-        };
+        }
+        ;
 
-        PathParser.prototype.ReadNumber = function (stream) {
+        function skipArgumentSeparator(stream) {
+            skipWhitespace(stream);
+            skipComma(stream);
+            skipWhitespace(stream);
+        }
+        ;
+
+        function readNumber(stream) {
+            var readNextDigits = function (s) {
+                var digits = "";
+                while (isDigit(s.Current)) {
+                    digits += s.Current;
+                    s.MoveNext();
+                }
+                return digits;
+            };
+
             var numStr = "";
 
-            if (this.IsNegativeSign(stream.Current)) {
+            if (isNegativeSign(stream.Current)) {
                 numStr += stream.Current;
                 stream.MoveNext();
             }
 
-            if (this.IsNumber(stream.Current)) {
-                while (this.IsNumber(stream.Current)) {
-                    numStr += stream.Current;
-                    stream.MoveNext();
-                }
+            if (isDigit(stream.Current)) {
+                numStr += readNextDigits(stream);
             }
 
-            if (this.IsDecimal(stream.Current)) {
+            if (isDecimal(stream.Current)) {
                 numStr += stream.Current;
                 stream.MoveNext();
 
-                if (this.IsNumber(stream.Current)) {
-                    while (this.IsNumber(stream.Current)) {
-                        numStr += stream.Current;
-                        stream.MoveNext();
-                    }
+                if (isDigit(stream.Current)) {
+                    numStr += readNextDigits(stream);
 
                     if (stream.Current === "E") {
                         numStr += stream.Current;
                         stream.MoveNext();
-                        if (this.IsNegativeSign(stream.Current)) {
+                        if (isNegativeSign(stream.Current)) {
                             numStr += stream.Current;
                             stream.MoveNext();
                         }
 
-                        if (!this.IsNumber(stream.Current))
+                        if (!isDigit(stream.Current))
                             throw "Invalid number";
-                        while (this.IsNumber(stream.Current)) {
-                            numStr += stream.Current;
-                            stream.MoveNext();
-                        }
+                        numStr += readNextDigits(stream);
                     }
                 }
             }
 
             return Number(numStr);
-        };
+        }
 
-        PathParser.prototype.ReadNumberAndSkipSeparator = function (stream) {
-            var num = this.ReadNumber(stream);
-            this.SkipArgumentSeparator(stream);
+        function readNumberAndSkipSeparator(stream) {
+            var num = readNumber(stream);
+            skipArgumentSeparator(stream);
 
             return num;
-        };
+        }
 
-        PathParser.prototype.ReadPoint = function (stream) {
-            var x = this.ReadNumber(stream);
-            this.SkipArgumentSeparator(stream);
-            var y = this.ReadNumber(stream);
+        function readNumberAndSkipWhitespace(stream) {
+            var num = readNumber(stream);
+            skipWhitespace(stream);
+
+            return num;
+        }
+
+        function readPoint(stream) {
+            var x = readNumberAndSkipSeparator(stream);
+            var y = readNumber(stream);
 
             return new Point(x, y);
-        };
+        }
 
-        PathParser.prototype.ReadPointAndSkipSeparator = function (stream) {
-            var point = this.ReadPoint(stream);
-            this.SkipArgumentSeparator(stream);
+        function readPointAndSkipSeparator(stream) {
+            var point = readPoint(stream);
+            skipArgumentSeparator(stream);
 
             return point;
-        };
+        }
 
-        PathParser.prototype.ParseFillStyleCommand = function (stream) {
+        function readPointAndSkipWhitespace(stream) {
+            var point = readPoint(stream);
+            skipWhitespace(stream);
+
+            return point;
+        }
+
+        function parseFillStyleCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing fill style command";
 
-            var fillRule;
+            var resolveRule = function (num) {
+                switch (num) {
+                    case 0:
+                        return 0 /* EvenOdd */;
+                    case 1:
+                        return 1 /* NonZero */;
+                }
 
-            switch (this.ReadNumber(stream)) {
-                case 0:
-                    fillRule = 0 /* EvenOdd */;
-                    break;
-                case 1:
-                    fillRule = 1 /* NonZero */;
-                    break;
-                default:
-                    throw "Invalid fill style option. Valid options are 0 (evenodd) and 1 (nonzero)";
-            }
+                throw "Invalid fill style option. Valid options are 0 (evenodd) and 1 (nonzero)";
+            };
 
-            this.SkipWhitespace(stream);
+            var fillRule = resolveRule(readNumberAndSkipWhitespace(stream));
 
-            return [PathCommandFactory.createFillRuleCommand(fillRule)];
-        };
+            return [CommandFactory.createFillRuleCommand(fillRule)];
+        }
 
-        PathParser.prototype.ParseMoveToCommand = function (stream) {
+        function parseMoveToCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing move to command";
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
-            var p = this.ReadPoint(stream);
+            var p = readPointAndSkipWhitespace(stream);
 
-            this.SkipWhitespace(stream);
+            return [CommandFactory.createMoveToCommand(p)];
+        }
 
-            return [PathCommandFactory.createMoveToCommand(p)];
-        };
-
-        PathParser.prototype.ParseLineToCommand = function (stream) {
+        function parseLineToCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
             var commands = [];
 
-            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var p = this.ReadPoint(stream);
-                this.SkipWhitespace(stream);
-                commands.push(PathCommandFactory.createLineToCommand(p));
+            while (!isCommandCharacter(stream.Current) && stream.Current != null) {
+                var p = readPointAndSkipWhitespace(stream);
+                commands.push(CommandFactory.createLineToCommand(p));
             }
 
             return commands;
-        };
+        }
 
-        PathParser.prototype.ParseCubicBezierCurveCommand = function (stream) {
+        function parseCubicBezierCurveCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
             var commands = [];
 
-            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var cp1 = this.ReadPointAndSkipSeparator(stream);
-                var cp2 = this.ReadPointAndSkipSeparator(stream);
-                var ep = this.ReadPointAndSkipSeparator(stream);
-                commands.push(PathCommandFactory.createCubicBezierCurveCommand(cp1, cp2, ep));
+            while (!isCommandCharacter(stream.Current) && stream.Current != null) {
+                var cp1 = readPointAndSkipSeparator(stream);
+                var cp2 = readPointAndSkipSeparator(stream);
+                var ep = readPointAndSkipSeparator(stream);
+                commands.push(CommandFactory.createCubicBezierCurveCommand(cp1, cp2, ep));
             }
 
             return commands;
-        };
+        }
 
-        PathParser.prototype.ParseQuadraticBezierCurveCommand = function (stream) {
+        function parseQuadraticBezierCurveCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
             var commands = [];
 
-            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var cp = this.ReadPointAndSkipSeparator(stream);
-                var ep = this.ReadPointAndSkipSeparator(stream);
+            while (!isCommandCharacter(stream.Current) && stream.Current != null) {
+                var cp = readPointAndSkipSeparator(stream);
+                var ep = readPointAndSkipSeparator(stream);
 
-                commands.push(PathCommandFactory.createQuadraticBezierCurveCommand(cp, ep));
+                commands.push(CommandFactory.createQuadraticBezierCurveCommand(cp, ep));
             }
 
             return commands;
-        };
+        }
 
-        PathParser.prototype.ParseEllipticalArcCommand = function (stream) {
+        function parseEllipticalArcCommand(stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
             var commands = [];
 
-            while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var center = this.ReadPointAndSkipSeparator(stream);
-                var radius = this.ReadNumberAndSkipSeparator(stream);
-                var startAngle = this.ReadNumberAndSkipSeparator(stream);
-                var endAngle = this.ReadNumberAndSkipSeparator(stream);
-                var ccw = this.ReadNumberAndSkipSeparator(stream) === 1;
-                commands.push(PathCommandFactory.createEllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
+            while (!isCommandCharacter(stream.Current) && stream.Current != null) {
+                var center = readPointAndSkipSeparator(stream);
+                var radius = readNumberAndSkipSeparator(stream);
+                var startAngle = readNumberAndSkipSeparator(stream);
+                var endAngle = readNumberAndSkipSeparator(stream);
+                var ccw = readNumberAndSkipSeparator(stream) === 1;
+                commands.push(CommandFactory.createEllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
             }
 
             return commands;
-        };
+        }
 
-        PathParser.prototype.ParseClosePathCommand = function (stream) {
+        function parseClosePathCommand(stream) {
             stream.MoveNext();
-            this.SkipWhitespace(stream);
+            skipWhitespace(stream);
 
-            return [PathCommandFactory.createClosePathCommand()];
+            return [CommandFactory.createClosePathCommand()];
+        }
+
+        var commandMappings = {
+            "F": parseFillStyleCommand,
+            "M": parseMoveToCommand,
+            "L": parseLineToCommand,
+            "C": parseCubicBezierCurveCommand,
+            "Q": parseQuadraticBezierCurveCommand,
+            "A": parseEllipticalArcCommand,
+            "Z": parseClosePathCommand
         };
 
-        PathParser.prototype.ResolveInitialCommand = function (stream) {
-            this.SkipWhitespace(stream);
+        function getCommandParser(command) {
+            var cmd = commandMappings[command];
+            if (!cmd)
+                throw "Invalid command";
 
-            switch (stream.Current) {
-                case "F":
-                    return this.ParseFillStyleCommand(stream);
-                case "M":
-                    return this.ParseMoveToCommand(stream);
-            }
+            return cmd;
+        }
+
+        function resolveCommand(validCommands, current) {
+            if (validCommands.indexOf(current) !== -1)
+                return getCommandParser(current);
 
             throw "Invalid command";
-        };
+        }
 
-        PathParser.prototype.ResolveDrawingCommands = function (stream) {
-            switch (stream.Current) {
-                case "M":
-                    return this.ParseMoveToCommand(stream);
-                case "L":
-                    return this.ParseLineToCommand(stream);
-                case "C":
-                    return this.ParseCubicBezierCurveCommand(stream);
-                case "Q":
-                    return this.ParseQuadraticBezierCurveCommand(stream);
-                case "A":
-                    return this.ParseEllipticalArcCommand(stream);
-                case "Z":
-                    return this.ParseClosePathCommand(stream);
-            }
-
-            throw "Invalid command";
-        };
-
-        PathParser.prototype.Parse = function (path) {
-            if (path === "")
+        function Parse(path) {
+            if (path === null || path === "")
                 return [];
 
-            var stream = new TextStream(path.toUpperCase());
+            var resolveInitialCommand = (function (commands) {
+                return function (current) {
+                    return resolveCommand(commands, current);
+                };
+            })(["F", "M"]);
 
-            var commands = this.ResolveInitialCommand(stream);
+            var resolveSecondaryCommand = (function (commands) {
+                return function (current) {
+                    return resolveCommand(commands, current);
+                };
+            })(["M", "L", "C", "Q", "A", "Z"]);
+
+            var stream = new TextStream(path.toUpperCase().trim());
+
+            var commands = resolveInitialCommand(stream.Current)(stream);
 
             while (true) {
-                commands = commands.concat(this.ResolveDrawingCommands(stream));
+                commands = commands.concat(resolveSecondaryCommand(stream.Current)(stream));
 
-                if (stream.Current != null && this.IsCommandCharacter(stream.Current))
+                if (stream.Current != null && isCommandCharacter(stream.Current))
                     continue;
                 if (!stream.MoveNext())
                     break;
             }
 
             return commands;
-        };
-        return PathParser;
-    })();
-    TsPath.PathParser = PathParser;
+        }
+        PathParser.Parse = Parse;
+    })(TsPath.PathParser || (TsPath.PathParser = {}));
+    var PathParser = TsPath.PathParser;
 })(TsPath || (TsPath = {}));
 
 var CanvasHelper;
 (function (CanvasHelper) {
-    var defaults = {
+    var defaultOptions = {
         penColor: "black",
         fillRule: "evenodd",
         lineWidth: 1,
@@ -400,24 +413,24 @@ var CanvasHelper;
 
         if (options) {
             context.lineWidth = options.strokeThickness || 1;
-            context.strokeStyle = options.strokeStyle || defaults.penColor;
-            context.fillStyle = options.fillStyle || defaults.penColor;
-            context.scale(options.scaleX || defaults.xScale, options.scaleY || defaults.yScale);
-            context.translate(options.translateX || defaults.xTransform, options.translateY || defaults.yTransform);
+            context.strokeStyle = options.strokeStyle || defaultOptions.penColor;
+            context.fillStyle = options.fillStyle || defaultOptions.penColor;
+            context.scale(options.scaleX || defaultOptions.xScale, options.scaleY || defaultOptions.yScale);
+            context.translate(options.translateX || defaultOptions.xTransform, options.translateY || defaultOptions.yTransform);
         } else {
-            context.lineWidth = defaults.lineWidth;
-            context.strokeStyle = defaults.penColor;
-            context.fillStyle = defaults.penColor;
+            context.lineWidth = defaultOptions.lineWidth;
+            context.strokeStyle = defaultOptions.penColor;
+            context.fillStyle = defaultOptions.penColor;
         }
 
         context.beginPath();
 
-        (new TsPath.PathParser()).Parse(pathText).forEach(function (c) {
+        TsPath.PathParser.Parse(pathText).forEach(function (c) {
             return c(context);
         });
 
         context.stroke();
-        context.fill(context.msFillRule || defaults.fillRule);
+        context.fill(context.msFillRule || defaultOptions.fillRule);
     }
     CanvasHelper.drawPath = drawPath;
 })(CanvasHelper || (CanvasHelper = {}));
