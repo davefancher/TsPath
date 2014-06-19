@@ -188,12 +188,26 @@
             return Number(numStr);
         };
 
+        PathParser.prototype.ReadNumberAndSkipSeparator = function (stream) {
+            var num = this.ReadNumber(stream);
+            this.SkipArgumentSeparator(stream);
+
+            return num;
+        };
+
         PathParser.prototype.ReadPoint = function (stream) {
             var x = this.ReadNumber(stream);
             this.SkipArgumentSeparator(stream);
             var y = this.ReadNumber(stream);
 
             return new Point(x, y);
+        };
+
+        PathParser.prototype.ReadPointAndSkipSeparator = function (stream) {
+            var point = this.ReadPoint(stream);
+            this.SkipArgumentSeparator(stream);
+
+            return point;
         };
 
         PathParser.prototype.ParseFillStyleCommand = function (stream) {
@@ -254,12 +268,9 @@
             var commands = [];
 
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var cp1 = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
-                var cp2 = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
-                var ep = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
+                var cp1 = this.ReadPointAndSkipSeparator(stream);
+                var cp2 = this.ReadPointAndSkipSeparator(stream);
+                var ep = this.ReadPointAndSkipSeparator(stream);
                 commands.push(PathCommandFactory.createCubicBezierCurveCommand(cp1, cp2, ep));
             }
 
@@ -274,10 +285,8 @@
             var commands = [];
 
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var cp = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
-                var ep = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
+                var cp = this.ReadPointAndSkipSeparator(stream);
+                var ep = this.ReadPointAndSkipSeparator(stream);
 
                 commands.push(PathCommandFactory.createQuadraticBezierCurveCommand(cp, ep));
             }
@@ -293,16 +302,11 @@
             var commands = [];
 
             while (!this.IsCommandCharacter(stream.Current) && stream.Current != null) {
-                var center = this.ReadPoint(stream);
-                this.SkipArgumentSeparator(stream);
-                var radius = this.ReadNumber(stream);
-                this.SkipArgumentSeparator(stream);
-                var startAngle = this.ReadNumber(stream);
-                this.SkipArgumentSeparator(stream);
-                var endAngle = this.ReadNumber(stream);
-                this.SkipArgumentSeparator(stream);
-                var ccw = this.ReadNumber(stream) === 1;
-                this.SkipArgumentSeparator(stream);
+                var center = this.ReadPointAndSkipSeparator(stream);
+                var radius = this.ReadNumberAndSkipSeparator(stream);
+                var startAngle = this.ReadNumberAndSkipSeparator(stream);
+                var endAngle = this.ReadNumberAndSkipSeparator(stream);
+                var ccw = this.ReadNumberAndSkipSeparator(stream) === 1;
                 commands.push(PathCommandFactory.createEllipticalArcCommand(center, radius, startAngle, endAngle, ccw));
             }
 
@@ -372,28 +376,38 @@
     TsPath.PathParser = PathParser;
 })(TsPath || (TsPath = {}));
 
-var CanvasExtensions = (function () {
-    function CanvasExtensions() {
-    }
-    CanvasExtensions.clearCanvas = function (canvas) {
+var CanvasHelper;
+(function (CanvasHelper) {
+    var defaults = {
+        penColor: "black",
+        fillRule: "evenodd",
+        lineWidth: 1,
+        xScale: 1,
+        xTransform: 0,
+        yScale: 1,
+        yTransform: 0
+    };
+
+    function clearCanvas(canvas) {
         var context = canvas.getContext("2d");
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
-    };
+    }
+    CanvasHelper.clearCanvas = clearCanvas;
 
-    CanvasExtensions.drawPath = function (canvas, pathText, options) {
+    function drawPath(canvas, pathText, options) {
         var context = canvas.getContext("2d");
 
         if (options) {
             context.lineWidth = options.strokeThickness || 1;
-            context.strokeStyle = options.strokeStyle || "black";
-            context.fillStyle = options.fillStyle || "black";
-            context.scale(options.scaleX || 1, options.scaleY || 1);
-            context.translate(options.translateX || 0, options.translateY || 0);
+            context.strokeStyle = options.strokeStyle || defaults.penColor;
+            context.fillStyle = options.fillStyle || defaults.penColor;
+            context.scale(options.scaleX || defaults.xScale, options.scaleY || defaults.yScale);
+            context.translate(options.translateX || defaults.xTransform, options.translateY || defaults.yTransform);
         } else {
-            context.lineWidth = 1;
-            context.strokeStyle = "black";
-            context.fillStyle = "black";
+            context.lineWidth = defaults.lineWidth;
+            context.strokeStyle = defaults.penColor;
+            context.fillStyle = defaults.penColor;
         }
 
         context.beginPath();
@@ -403,8 +417,8 @@ var CanvasExtensions = (function () {
         });
 
         context.stroke();
-        context.fill(context.msFillRule || "evenodd");
-    };
-    return CanvasExtensions;
-})();
+        context.fill(context.msFillRule || defaults.fillRule);
+    }
+    CanvasHelper.drawPath = drawPath;
+})(CanvasHelper || (CanvasHelper = {}));
 //# sourceMappingURL=TsPath.js.map

@@ -127,8 +127,8 @@
                 translateY: document.getElementById("translateY").value,
             };
 
-            CanvasExtensions.clearCanvas(canvas);
-            CanvasExtensions.drawPath(canvas, pathText, options);
+            CanvasHelper.clearCanvas(canvas);
+            CanvasHelper.drawPath(canvas, pathText, options);
 
             document.getElementById("pathData").innerText = pathText;
         };
