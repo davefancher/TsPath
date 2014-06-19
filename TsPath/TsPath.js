@@ -6,6 +6,9 @@
         FillRule[FillRule["NonZero"] = 1] = "NonZero";
     })(FillRule || (FillRule = {}));
 
+    var _wsChars = [" ", "\t"];
+    var _commandChars = ["M", "L", "C", "Q", "A", "Z"];
+
     var Point = (function () {
         function Point(x, y) {
             this._xCoordinate = x;
@@ -35,23 +38,22 @@
         }
         Object.defineProperty(TextStream.prototype, "Current", {
             get: function () {
-                return this._position >= this._source.length ? null : this._source[this._position];
+                return this._char;
             },
             enumerable: true,
             configurable: true
         });
 
         TextStream.prototype.MoveNext = function () {
-            return ++this._position < this._source.length;
+            this._char = (++this._position < this._source.length) ? this._source[this._position] : null;
+            return (this._char !== null);
         };
+
         TextStream.prototype.Reset = function () {
-            this._position = 0;
+            this._char = this._source[this._position = 0];
         };
         return TextStream;
     })();
-
-    var _wsChars = [" ", "\t"];
-    var _commandChars = ["M", "L", "C", "Q", "A", "Z"];
 
     var CommandFactory;
     (function (CommandFactory) {
@@ -99,50 +101,42 @@
     })(CommandFactory || (CommandFactory = {}));
 
     (function (PathParser) {
-        function isCommandCharacter(current) {
+        var isCommandCharacter = function (current) {
             return _commandChars.indexOf(current) !== -1;
-        }
-
-        function isWhitespaceCharacter(current) {
+        };
+        var isWhitespaceCharacter = function (current) {
             return _wsChars.indexOf(current) !== -1;
-        }
-
-        function isNegativeSign(current) {
+        };
+        var isNegativeSign = function (current) {
             return current === "-";
-        }
-
-        function isComma(current) {
+        };
+        var isComma = function (current) {
             return current === ",";
-        }
-
-        function isDecimal(current) {
+        };
+        var isDecimal = function (current) {
             return current === ".";
-        }
-
-        function isDigit(current) {
+        };
+        var isDigit = function (current) {
             return !isNaN(parseInt(current, 10));
-        }
+        };
 
-        function skipWhitespace(stream) {
+        var skipWhitespace = function (stream) {
             while (isWhitespaceCharacter(stream.Current) && stream.MoveNext()) {
             }
-        }
-        ;
+        };
 
-        function skipComma(stream) {
+        var skipComma = function (stream) {
             if (isComma(stream.Current))
                 stream.MoveNext();
-        }
-        ;
+        };
 
-        function skipArgumentSeparator(stream) {
+        var skipArgumentSeparator = function (stream) {
             skipWhitespace(stream);
             skipComma(stream);
             skipWhitespace(stream);
-        }
-        ;
+        };
 
-        function readNumber(stream) {
+        var readNumber = function (stream) {
             var readNextDigits = function (s) {
                 var digits = "";
                 while (isDigit(s.Current)) {
@@ -186,44 +180,44 @@
             }
 
             return Number(numStr);
-        }
+        };
 
-        function readNumberAndSkipSeparator(stream) {
+        var readNumberAndSkipSeparator = function (stream) {
             var num = readNumber(stream);
             skipArgumentSeparator(stream);
 
             return num;
-        }
+        };
 
-        function readNumberAndSkipWhitespace(stream) {
+        var readNumberAndSkipWhitespace = function (stream) {
             var num = readNumber(stream);
             skipWhitespace(stream);
 
             return num;
-        }
+        };
 
-        function readPoint(stream) {
+        var readPoint = function (stream) {
             var x = readNumberAndSkipSeparator(stream);
             var y = readNumber(stream);
 
             return new Point(x, y);
-        }
+        };
 
-        function readPointAndSkipSeparator(stream) {
+        var readPointAndSkipSeparator = function (stream) {
             var point = readPoint(stream);
             skipArgumentSeparator(stream);
 
             return point;
-        }
+        };
 
-        function readPointAndSkipWhitespace(stream) {
+        var readPointAndSkipWhitespace = function (stream) {
             var point = readPoint(stream);
             skipWhitespace(stream);
 
             return point;
-        }
+        };
 
-        function parseFillStyleCommand(stream) {
+        var parseFillStyleCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing fill style command";
 
@@ -241,9 +235,9 @@
             var fillRule = resolveRule(readNumberAndSkipWhitespace(stream));
 
             return [CommandFactory.createFillRuleCommand(fillRule)];
-        }
+        };
 
-        function parseMoveToCommand(stream) {
+        var parseMoveToCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing move to command";
             skipWhitespace(stream);
@@ -251,9 +245,9 @@
             var p = readPointAndSkipWhitespace(stream);
 
             return [CommandFactory.createMoveToCommand(p)];
-        }
+        };
 
-        function parseLineToCommand(stream) {
+        var parseLineToCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             skipWhitespace(stream);
@@ -266,9 +260,9 @@
             }
 
             return commands;
-        }
+        };
 
-        function parseCubicBezierCurveCommand(stream) {
+        var parseCubicBezierCurveCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             skipWhitespace(stream);
@@ -283,9 +277,9 @@
             }
 
             return commands;
-        }
+        };
 
-        function parseQuadraticBezierCurveCommand(stream) {
+        var parseQuadraticBezierCurveCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             skipWhitespace(stream);
@@ -300,9 +294,9 @@
             }
 
             return commands;
-        }
+        };
 
-        function parseEllipticalArcCommand(stream) {
+        var parseEllipticalArcCommand = function (stream) {
             if (!stream.MoveNext())
                 throw "Unexpected end of stream while parsing line to command";
             skipWhitespace(stream);
@@ -319,41 +313,40 @@
             }
 
             return commands;
-        }
+        };
 
-        function parseClosePathCommand(stream) {
+        var parseClosePathCommand = function (stream) {
             stream.MoveNext();
             skipWhitespace(stream);
 
             return [CommandFactory.createClosePathCommand()];
-        }
+        };
 
-        var commandMappings = {
+        var getCommandParser = (function (commandMappings) {
+            return function (command) {
+                var cmd = commandMappings[command];
+                if (!cmd)
+                    throw "Invalid command";
+
+                return cmd;
+            };
+        })({
             "F": parseFillStyleCommand,
             "M": parseMoveToCommand,
             "L": parseLineToCommand,
             "C": parseCubicBezierCurveCommand,
             "Q": parseQuadraticBezierCurveCommand,
             "A": parseEllipticalArcCommand,
-            "Z": parseClosePathCommand
-        };
+            "Z": parseClosePathCommand });
 
-        function getCommandParser(command) {
-            var cmd = commandMappings[command];
-            if (!cmd)
-                throw "Invalid command";
-
-            return cmd;
-        }
-
-        function resolveCommand(validCommands, current) {
+        var resolveCommand = function (validCommands, current) {
             if (validCommands.indexOf(current) !== -1)
                 return getCommandParser(current);
 
             throw "Invalid command";
-        }
+        };
 
-        function Parse(path) {
+        PathParser.Parse = function (path) {
             if (path === null || path === "")
                 return [];
 
@@ -383,8 +376,7 @@
             }
 
             return commands;
-        }
-        PathParser.Parse = Parse;
+        };
     })(TsPath.PathParser || (TsPath.PathParser = {}));
     var PathParser = TsPath.PathParser;
 })(TsPath || (TsPath = {}));
@@ -401,14 +393,13 @@ var CanvasHelper;
         yTransform: 0
     };
 
-    function clearCanvas(canvas) {
+    CanvasHelper.clearCanvas = function (canvas) {
         var context = canvas.getContext("2d");
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, canvas.width, canvas.height);
-    }
-    CanvasHelper.clearCanvas = clearCanvas;
+    };
 
-    function drawPath(canvas, pathText, options) {
+    CanvasHelper.drawPath = function (canvas, pathText, options) {
         var context = canvas.getContext("2d");
 
         if (options) {
@@ -431,7 +422,6 @@ var CanvasHelper;
 
         context.stroke();
         context.fill(context.msFillRule || defaultOptions.fillRule);
-    }
-    CanvasHelper.drawPath = drawPath;
+    };
 })(CanvasHelper || (CanvasHelper = {}));
 //# sourceMappingURL=TsPath.js.map
